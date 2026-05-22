@@ -63,6 +63,8 @@ CTRL_KEYS = {
 LEFT_ALT = ecodes.KEY_LEFTALT
 RIGHT_ALT = ecodes.KEY_RIGHTALT  # AltGr
 
+SUSTAIN_KEY = ecodes.KEY_F10
+
 def required_modifiers_are_held(held_modifiers):
     has_shift = bool(held_modifiers & SHIFT_KEYS)
     has_ctrl = bool(held_modifiers & CTRL_KEYS)
@@ -76,6 +78,12 @@ def note_on(out, note, velocity=VELOCITY_DEFAULT):
 
 def note_off(out, note):
     out.send_message([0x80 | MIDI_CHANNEL, note, 0])
+
+def sustain_on(out):
+    out.send_message([0xB0 | MIDI_CHANNEL, 64, 127])
+
+def sustain_off(out):
+    out.send_message([0xB0 | MIDI_CHANNEL, 64, 0])
 
 def main():
     dev = InputDevice(DEVICE_PATH)
@@ -94,6 +102,7 @@ def main():
     # Key code -> note. This ensures note-off matches the original note
     # even if modifiers are released/change before the key release.
     active_notes_by_key = {}
+    sustain_active = False
 
     try:
         for event in dev.read_loop():
@@ -107,6 +116,19 @@ def main():
                     held_modifiers.add(code)
                 elif event.value == 0:
                     held_modifiers.discard(code)
+                continue
+
+            if code == SUSTAIN_KEY:
+                if event.value == 1:
+                    if required_modifiers_are_held(held_modifiers) and not sustain_active:
+                        sustain_on(midiout)
+                        sustain_active = True
+                        print("SUSTAIN ON")
+                elif event.value == 0:
+                    if sustain_active:
+                        sustain_off(midiout)
+                        sustain_active = False
+                        print("SUSTAIN OFF")
                 continue
 
             if code not in KEY_TO_NOTE:
@@ -137,6 +159,8 @@ def main():
         print("\nStopping. Sending note-off for any stuck notes.")
         for note in set(active_notes_by_key.values()):
             note_off(midiout, note)
+        if sustain_active:
+            sustain_off(midiout)
         sys.exit(0)
 
 if __name__ == "__main__":
