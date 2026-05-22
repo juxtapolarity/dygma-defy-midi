@@ -16,13 +16,19 @@
       ]);
     in
     {
+      apps.${system}.default = {
+        type = "app";
+        program = "${pkgs.writeShellScript "defy-midi" ''
+          exec ${python}/bin/python ${self}/defy-midi.py
+        ''}";
+      };
+
       devShells.${system}.default = pkgs.mkShell {
         packages = [
           python
           pkgs.uv
           pkgs.evtest
           pkgs.alsa-utils
-          pkgs.acl
         ];
 
         shellHook = ''
@@ -31,17 +37,11 @@
           echo "Defy MIDI dev shell"
           echo
           echo "Commands:"
-          echo "  defy-perms      Give this user access to the Defy event device"
           echo "  defy-evtest     Run evtest on the Defy keyboard device"
           echo "  defy-midi       Run ./defy-midi.py"
           echo "  defy-connect    Connect Defy MIDI to Midi Through"
-          echo "  defy-start      Run permissions + MIDI bridge"
           echo "  defy-status     Show ALSA MIDI ports"
           echo
-
-          defy-perms() {
-            sudo setfacl -m u:$USER:rw "$(readlink -f "$DEFY_KBD")"
-          }
 
           defy-evtest() {
             sudo "$(command -v evtest)" "$DEFY_KBD"
@@ -72,7 +72,6 @@
           }
 
           defy-start() {
-            defy-perms
             defy-midi
           }
         '';
