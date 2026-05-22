@@ -22,12 +22,20 @@
           ${python}/bin/python ${self}/defy-midi.py &
           BRIDGE_PID=$!
 
-          trap 'kill -INT $BRIDGE_PID 2>/dev/null' INT TERM
+          trap 'kill $BRIDGE_PID 2>/dev/null; wait $BRIDGE_PID 2>/dev/null' EXIT
 
           sleep 0.5
-          ${pkgs.alsa-utils}/bin/aconnect "Defy MIDI" "Midi Through" \
-            && echo "Connected: Defy MIDI → Midi Through" \
-            || echo "Warning: could not connect to Midi Through"
+
+          ALSA_CLIENT=$(${pkgs.alsa-utils}/bin/aconnect -l 2>/dev/null \
+            | awk -v p="pid=$BRIDGE_PID" '$0 ~ p { print $2+0; exit }')
+
+          if [ -n "$ALSA_CLIENT" ]; then
+            ${pkgs.alsa-utils}/bin/aconnect "$ALSA_CLIENT:0" 14:0 \
+              && echo "Connected: Defy MIDI → Midi Through" \
+              || echo "Warning: could not connect to Midi Through"
+          else
+            echo "Warning: could not find Defy MIDI ALSA client"
+          fi
 
           wait $BRIDGE_PID
         ''}";
