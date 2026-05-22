@@ -19,7 +19,17 @@
       apps.${system}.default = {
         type = "app";
         program = "${pkgs.writeShellScript "defy-midi" ''
-          exec ${python}/bin/python ${self}/defy-midi.py
+          ${python}/bin/python ${self}/defy-midi.py &
+          BRIDGE_PID=$!
+
+          trap 'kill -INT $BRIDGE_PID 2>/dev/null' INT TERM
+
+          sleep 0.5
+          ${pkgs.alsa-utils}/bin/aconnect "Defy MIDI" "Midi Through" \
+            && echo "Connected: Defy MIDI → Midi Through" \
+            || echo "Warning: could not connect to Midi Through"
+
+          wait $BRIDGE_PID
         ''}";
       };
 
